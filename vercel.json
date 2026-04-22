@@ -1,3 +1,0 @@
-{
-  "installCommand": "dnf install -y hostname && npm install"
-}
