@@ -168,24 +168,20 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
 
       // Authorization code flow - build redirect URI (some providers require fixed ports)
       const appPort = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
-      const appOrigin = window.location.origin;
-      const useHostedCodexCallback = provider === "codex" && !isLocalhost;
       let redirectUri;
       let codexProxyActive = false;
 
       if (provider === "codex") {
-        if (useHostedCodexCallback) {
-          redirectUri = `${appOrigin}/callback`;
-        } else {
-          try {
-            const proxyRes = await fetch(`/api/oauth/codex/start-proxy?app_port=${appPort}`);
-            const proxyData = await proxyRes.json();
-            codexProxyActive = proxyData.success;
-          } catch {
-            codexProxyActive = false;
-          }
-          redirectUri = "http://localhost:1455/auth/callback";
+        // Try to start proxy on fixed port 1455 → redirect callback to app port
+        try {
+          const proxyRes = await fetch(`/api/oauth/codex/start-proxy?app_port=${appPort}`);
+          const proxyData = await proxyRes.json();
+          codexProxyActive = proxyData.success;
+        } catch {
+          codexProxyActive = false;
         }
+        // Always use fixed port 1455 as redirect_uri (Codex requirement)
+        redirectUri = "http://localhost:1455/auth/callback";
       } else {
         redirectUri = `http://localhost:${appPort}/callback`;
       }
@@ -202,20 +198,24 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
 
       setAuthData({ ...data, redirectUri });
 
-      const canAutoHandleCallback = provider === "codex"
-        ? useHostedCodexCallback || codexProxyActive
-        : isLocalhost;
-
-      if (canAutoHandleCallback) {
+      if (provider === "codex" && codexProxyActive) {
+        // Proxy active: callback will redirect to app port automatically
         setStep("waiting");
         popupRef.current = window.open(data.authUrl, "oauth_popup", "width=600,height=700");
         if (!popupRef.current) {
           setStep("input");
         }
-      } else {
-        // Remote instances and local Codex without the helper proxy fall back to manual paste mode.
+      } else if (!isLocalhost || provider === "codex") {
+        // Non-localhost or proxy failed: manual input mode
         setStep("input");
         window.open(data.authUrl, "_blank");
+      } else {
+        // Localhost (non-Codex): Open popup and wait for message
+        setStep("waiting");
+        popupRef.current = window.open(data.authUrl, "oauth_popup", "width=600,height=700");
+        if (!popupRef.current) {
+          setStep("input");
+        }
       }
     } catch (err) {
       setError(err.message);

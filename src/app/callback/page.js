@@ -24,10 +24,19 @@ function CallbackContent() {
       fullUrl: window.location.href,
     };
 
+    let relayed = false;
+
+    // Check if this callback is from expected origin/port
+    const expectedOrigins = [
+      window.location.origin, // Same origin (for most providers)
+      "http://localhost:1455", // Codex specific port
+    ];
+    
     // Method 1: postMessage to opener (popup mode)
     if (window.opener) {
       try {
         window.opener.postMessage({ type: "oauth_callback", data: callbackData }, "*");
+        relayed = true;
       } catch (e) {
         console.log("postMessage failed:", e);
       }
@@ -38,6 +47,7 @@ function CallbackContent() {
       const channel = new BroadcastChannel("oauth_callback");
       channel.postMessage(callbackData);
       channel.close();
+      relayed = true;
     } catch (e) {
       console.log("BroadcastChannel failed:", e);
     }
@@ -45,6 +55,7 @@ function CallbackContent() {
     // Method 3: localStorage event (fallback)
     try {
       localStorage.setItem("oauth_callback", JSON.stringify({ ...callbackData, timestamp: Date.now() }));
+      relayed = true;
     } catch (e) {
       console.log("localStorage failed:", e);
     }
