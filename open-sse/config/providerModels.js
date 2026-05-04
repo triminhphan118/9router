@@ -5,6 +5,27 @@ import { buildTtsProviderModels } from "./ttsModels.js";
 // Key = alias (cc, cx, gc, qw, if, ag, gh for OAuth; id for API Key)
 // Field "provider" for special cases (e.g. AntiGravity models that call different backends)
 
+const CODEX_REVIEW_SUFFIX = "-review";
+
+function withCodexReviewModels(models) {
+  return models.flatMap((model) => {
+    if ((model.type || "llm") !== "llm" || model.id.endsWith(CODEX_REVIEW_SUFFIX)) {
+      return [model];
+    }
+
+    return [
+      model,
+      {
+        ...model,
+        id: `${model.id}${CODEX_REVIEW_SUFFIX}`,
+        name: `${model.name} Review`,
+        upstreamModelId: model.upstreamModelId || model.id,
+        quotaFamily: "review",
+      },
+    ];
+  });
+}
+
 export const PROVIDER_MODELS = {
   // OAuth Providers (using alias)
   cc: [  // Claude Code
@@ -15,7 +36,8 @@ export const PROVIDER_MODELS = {
     { id: "claude-sonnet-4-5-20250929", name: "Claude 4.5 Sonnet" },
     { id: "claude-haiku-4-5-20251001", name: "Claude 4.5 Haiku" },
   ],
-  cx: [  // OpenAI Codex
+  cx: withCodexReviewModels([  // OpenAI Codex
+    { id: "gpt-5.5", name: "GPT 5.5" },
     { id: "gpt-5.4", name: "GPT 5.4" },
     // GPT 5.3 Codex - all thinking levels
     { id: "gpt-5.3-codex", name: "GPT 5.3 Codex" },
@@ -35,7 +57,11 @@ export const PROVIDER_MODELS = {
     { id: "gpt-5.1", name: "GPT 5.1" },
     { id: "gpt-5-codex", name: "GPT 5 Codex" },
     { id: "gpt-5-codex-mini", name: "GPT 5 Codex Mini" },
-  ],
+    // Image models (uses image_generation tool, requires Plus/Pro plan)
+    { id: "gpt-5.4-image", name: "GPT 5.4 Image", type: "image", capabilities: ["text2img", "edit"], params: ["size", "quality", "background", "image_detail", "output_format"] },
+    { id: "gpt-5.3-image", name: "GPT 5.3 Image", type: "image", capabilities: ["text2img", "edit"], params: ["size", "quality", "background", "image_detail", "output_format"] },
+    { id: "gpt-5.2-image", name: "GPT 5.2 Image", type: "image", capabilities: ["text2img", "edit"], params: ["size", "quality", "background", "image_detail", "output_format"] },
+  ]),
   gc: [  // Gemini CLI
     { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview" },
     { id: "gemini-3-pro-preview", name: "Gemini 3 Pro Preview" },
@@ -100,6 +126,9 @@ export const PROVIDER_MODELS = {
     { id: "grok-code-fast-1", name: "Grok Code Fast 1" },
     { id: "oswe-vscode-prime", name: "Raptor Mini" },
     { id: "goldeneye-free-auto", name: "GoldenEye" },
+    // GitHub Copilot - Embedding models
+    { id: "text-embedding-3-small", name: "Text Embedding 3 Small (GitHub)", type: "embedding" },
+    { id: "text-embedding-3-large", name: "Text Embedding 3 Large (GitHub)", type: "embedding" },
   ],
   kr: [  // Kiro AI
     // { id: "claude-opus-4.5", name: "Claude Opus 4.5" },
@@ -205,9 +234,9 @@ export const PROVIDER_MODELS = {
     { id: "tts-1-hd", name: "TTS-1 HD", type: "tts" },
     { id: "gpt-4o-mini-tts", name: "GPT-4o Mini TTS", type: "tts" },
     // Image models
-    { id: "gpt-image-1", name: "GPT Image 1", type: "image" },
-    { id: "dall-e-3", name: "DALL-E 3", type: "image" },
-    { id: "dall-e-2", name: "DALL-E 2", type: "image" },
+    { id: "gpt-image-1", name: "GPT Image 1", type: "image", params: ["n", "size", "quality", "response_format"] },
+    { id: "dall-e-3", name: "DALL-E 3", type: "image", params: ["size", "quality", "style", "response_format"] },
+    { id: "dall-e-2", name: "DALL-E 2", type: "image", params: ["n", "size", "response_format"] },
   ],
   anthropic: [
     { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4" },
@@ -218,7 +247,6 @@ export const PROVIDER_MODELS = {
     // Gemini 3.1 series
     { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview" },
     { id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite Preview" },
-    { id: "gemini-3.1-flash-image-preview", name: "Gemini 3.1 Flash Image Preview" },
     // Gemini 3 series
     { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview" },
     // Gemini 2.5 series
@@ -236,9 +264,9 @@ export const PROVIDER_MODELS = {
     { id: "text-embedding-005", name: "Text Embedding 005", type: "embedding" },
     { id: "text-embedding-004", name: "Text Embedding 004 (Legacy)", type: "embedding" },
     // Image models (Nano Banana)
-    { id: "gemini-3.1-flash-image-preview", name: "Gemini 3.1 Flash Image (Nano Banana 2)", type: "image" },
-    { id: "gemini-3-pro-image-preview", name: "Gemini 3 Pro Image (Nano Banana Pro)", type: "image" },
-    { id: "gemini-2.5-flash-image", name: "Gemini 2.5 Flash Image (Nano Banana)", type: "image" },
+    { id: "gemini-3.1-flash-image-preview", name: "Gemini 3.1 Flash Image (Nano Banana 2)", type: "image", params: [] },
+    { id: "gemini-3-pro-image-preview", name: "Gemini 3 Pro Image (Nano Banana Pro)", type: "image", params: [] },
+    { id: "gemini-2.5-flash-image", name: "Gemini 2.5 Flash Image (Nano Banana)", type: "image", params: [] },
   ],
   openrouter: [
     // Embedding models
@@ -254,10 +282,10 @@ export const PROVIDER_MODELS = {
     { id: "openai/tts-1-hd",        name: "TTS-1 HD",        type: "tts" },
     { id: "openai/tts-1",           name: "TTS-1",           type: "tts" },
     // Image models
-    { id: "openai/dall-e-3", name: "DALL-E 3 (via OpenRouter)", type: "image" },
-    { id: "openai/gpt-image-1", name: "GPT Image 1 (via OpenRouter)", type: "image" },
-    { id: "google/imagen-3.0-generate-002", name: "Imagen 3 (via OpenRouter)", type: "image" },
-    { id: "black-forest-labs/FLUX.1-schnell", name: "FLUX.1 Schnell (via OpenRouter)", type: "image" },
+    { id: "openai/dall-e-3", name: "DALL-E 3 (via OpenRouter)", type: "image", params: ["size", "quality", "style", "response_format"] },
+    { id: "openai/gpt-image-1", name: "GPT Image 1 (via OpenRouter)", type: "image", params: ["n", "size", "quality", "response_format"] },
+    { id: "google/imagen-3.0-generate-002", name: "Imagen 3 (via OpenRouter)", type: "image", params: ["n", "size"] },
+    { id: "black-forest-labs/FLUX.1-schnell", name: "FLUX.1 Schnell (via OpenRouter)", type: "image", params: ["n", "size"] },
   ],
   glm: [
     { id: "glm-5.1", name: "GLM 5.1" },
@@ -282,7 +310,7 @@ export const PROVIDER_MODELS = {
     { id: "MiniMax-M2.5", name: "MiniMax M2.5" },
     { id: "MiniMax-M2.1", name: "MiniMax M2.1" },
     // Image models
-    { id: "minimax-image-01", name: "MiniMax Image 01", type: "image" },
+    { id: "minimax-image-01", name: "MiniMax Image 01", type: "image", params: ["n", "size", "response_format"] },
   ],
   blackbox: [
     { id: "gpt-4o", name: "GPT-4o" },
@@ -327,7 +355,45 @@ export const PROVIDER_MODELS = {
     { id: "qwen3-coder-plus", name: "Qwen3 Coder Plus" },
     { id: "glm-4.7", name: "GLM 4.7" },
   ],
+  "volcengine-ark": [
+    { id: "Doubao-Seed-2.0-Code", name: "Doubao-Seed-2.0-Code" },
+    { id: "Doubao-Seed-2.0-pro", name: "Doubao-Seed-2.0-pro" },
+    { id: "Doubao-Seed-2.0-lite", name: "Doubao-Seed-2.0-lite" },
+    { id: "Doubao-Seed-Code", name: "Doubao-Seed-Code" },
+    { id: "GLM-5.1", name: "GLM-5.1" },
+    { id: "MiniMax-M2.7", name: "MiniMax-M2.7" },
+    { id: "Kimi-K2.6", name: "Kimi-K2.6" },
+    { id: "MiniMax-M2.5", name: "MiniMax-M2.5" },
+    { id: "Kimi-K2.5", name: "Kimi-K2.5" },
+    { id: "GLM-4.7", name: "GLM-4.7" },
+    { id: "DeepSeek-V3.2", name: "DeepSeek-V3.2" },
+  ],
+  "cloudflare-ai": [
+    { id: "@cf/meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B Instruct" },
+    { id: "@cf/meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B Instruct" },
+    { id: "@cf/meta/llama-3.1-8b-instruct-fp8-fast", name: "Llama 3.1 8B Instruct FP8 Fast" },
+    { id: "@cf/meta/llama-3.1-8b-instruct-awq", name: "Llama 3.1 8B Instruct AWQ" },
+    { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B Instruct" },
+    { id: "@cf/meta/llama-3.1-70b-instruct-fp8-fast", name: "Llama 3.1 70B Instruct FP8 Fast" },
+    { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B Instruct FP8 Fast" },
+    { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", name: "DeepSeek R1 Distill Qwen 32B" },
+    { id: "@cf/moonshotai/kimi-k2.5", name: "Kimi K2.5" },
+    { id: "@cf/moonshotai/kimi-k2.6", name: "Kimi K2.6" },
+    { id: "@cf/zai-org/glm-4.7-flash", name: "GLM 4.7 Flash" },
+    { id: "@cf/qwen/qwq-32b", name: "QwQ 32B" },
+    { id: "@cf/qwen/qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B Instruct" },
+  ],
+  byteplus: [
+    { id: "seed-2-0-pro-260328", name: "Seed 2.0 Pro" },
+    { id: "seed-2-0-code-preview-260328", name: "Seed 2.0 Code Preview" },
+    { id: "seed-2-0-mini-260215", name: "Seed 2.0 Mini" },
+    { id: "seed-2-0-lite-260228", name: "Seed 2.0 Lite" },
+    { id: "kimi-k2-thinking-251104", name: "Kimi K2 Thinking" },
+    { id: "glm-4-7-251222", name: "GLM 4.7" },
+    { id: "gpt-oss-120b-250805", name: "GPT-OSS-120B" },
+  ],
   deepseek: [
+    { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
     { id: "deepseek-chat", name: "DeepSeek V3.2 Chat" },
     { id: "deepseek-reasoner", name: "DeepSeek V3.2 Reasoner" },
   ],
@@ -347,6 +413,7 @@ export const PROVIDER_MODELS = {
     { id: "mistral-large-latest", name: "Mistral Large 3" },
     { id: "codestral-latest", name: "Codestral" },
     { id: "mistral-medium-latest", name: "Mistral Medium 3" },
+    { id: "mistral-embed", name: "Mistral Embed", type: "embedding" },
   ],
   perplexity: [
     { id: "sonar-pro", name: "Sonar Pro" },
@@ -357,11 +424,14 @@ export const PROVIDER_MODELS = {
     { id: "deepseek-ai/DeepSeek-R1", name: "DeepSeek R1" },
     { id: "Qwen/Qwen3-235B-A22B", name: "Qwen3 235B" },
     { id: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8", name: "Llama 4 Maverick" },
+    { id: "BAAI/bge-large-en-v1.5", name: "BGE Large EN v1.5", type: "embedding" },
+    { id: "togethercomputer/m2-bert-80M-8k-retrieval", name: "M2 BERT 80M 8K", type: "embedding" },
   ],
   fireworks: [
     { id: "accounts/fireworks/models/deepseek-v3p1", name: "DeepSeek V3.1" },
     { id: "accounts/fireworks/models/llama-v3p3-70b-instruct", name: "Llama 3.3 70B" },
     { id: "accounts/fireworks/models/qwen3-235b-a22b", name: "Qwen3 235B" },
+    { id: "nomic-ai/nomic-embed-text-v1.5", name: "Nomic Embed Text v1.5", type: "embedding" },
   ],
   cerebras: [
     { id: "gpt-oss-120b", name: "GPT OSS 120B" },
@@ -377,11 +447,22 @@ export const PROVIDER_MODELS = {
     { id: "command-a-03-2025", name: "Command A (Mar 2025)" },
   ],
   nvidia: [
-    { id: "moonshotai/kimi-k2.5", name: "Kimi K2.5" },
+    { id: "minimaxai/minimax-m2.7", name: "Minimax M2.7" },
     { id: "z-ai/glm4.7", name: "GLM 4.7" },
+    { id: "nvidia/nv-embedqa-e5-v5", name: "NV EmbedQA E5 v5", type: "embedding" },
   ],
   nebius: [
     { id: "meta-llama/Llama-3.3-70B-Instruct", name: "Llama 3.3 70B Instruct" },
+    { id: "Qwen/Qwen3-Embedding-8B", name: "Qwen3 Embedding 8B", type: "embedding" },
+  ],
+  "voyage-ai": [
+    { id: "voyage-3-large", name: "Voyage 3 Large", type: "embedding" },
+    { id: "voyage-3.5", name: "Voyage 3.5", type: "embedding" },
+    { id: "voyage-3.5-lite", name: "Voyage 3.5 Lite", type: "embedding" },
+    { id: "voyage-code-3", name: "Voyage Code 3", type: "embedding" },
+    { id: "voyage-finance-2", name: "Voyage Finance 2", type: "embedding" },
+    { id: "voyage-law-2", name: "Voyage Law 2", type: "embedding" },
+    { id: "voyage-multilingual-2", name: "Voyage Multilingual 2", type: "embedding" },
   ],
   siliconflow: [
     { id: "deepseek-ai/DeepSeek-V3.2", name: "DeepSeek V3.2" },
@@ -394,6 +475,12 @@ export const PROVIDER_MODELS = {
     { id: "zai-org/GLM-4.7", name: "GLM 4.7" },
     { id: "openai/gpt-oss-120b", name: "GPT OSS 120B" },
     { id: "baidu/ERNIE-4.5-300B-A47B", name: "ERNIE 4.5 300B" },
+  ],
+  "xiaomi-mimo": [
+    { id: "mimo-v2.5-pro", name: "MiMo V2.5 Pro" },
+    { id: "mimo-v2.5", name: "MiMo V2.5" },
+    { id: "mimo-v2-omni", name: "MiMo V2 Omni" },
+    { id: "mimo-v2-flash", name: "MiMo V2 Flash" },
   ],
   hyperbolic: [
     { id: "Qwen/QwQ-32B", name: "QwQ 32B" },
@@ -454,20 +541,20 @@ export const PROVIDER_MODELS = {
 
   // Image providers
   nanobanana: [
-    { id: "nanobanana-flash", name: "NanoBanana Flash", type: "image" },
-    { id: "nanobanana-pro", name: "NanoBanana Pro", type: "image" },
+    { id: "nanobanana-flash", name: "NanoBanana Flash", type: "image", params: ["n", "size"] },
+    { id: "nanobanana-pro", name: "NanoBanana Pro", type: "image", params: ["n", "size"] },
   ],
   sdwebui: [
-    { id: "stable-diffusion-v1-5", name: "Stable Diffusion v1.5", type: "image" },
-    { id: "sdxl-base-1.0", name: "SDXL Base 1.0", type: "image" },
+    { id: "stable-diffusion-v1-5", name: "Stable Diffusion v1.5", type: "image", params: ["n", "size"] },
+    { id: "sdxl-base-1.0", name: "SDXL Base 1.0", type: "image", params: ["n", "size"] },
   ],
   comfyui: [
-    { id: "flux-dev", name: "FLUX Dev", type: "image" },
-    { id: "sdxl", name: "SDXL", type: "image" },
+    { id: "flux-dev", name: "FLUX Dev", type: "image", params: ["n", "size"] },
+    { id: "sdxl", name: "SDXL", type: "image", params: ["n", "size"] },
   ],
   huggingface: [
-    { id: "black-forest-labs/FLUX.1-schnell", name: "FLUX.1 Schnell", type: "image" },
-    { id: "stabilityai/stable-diffusion-xl-base-1.0", name: "SDXL Base 1.0", type: "image" },
+    { id: "black-forest-labs/FLUX.1-schnell", name: "FLUX.1 Schnell", type: "image", params: [] },
+    { id: "stabilityai/stable-diffusion-xl-base-1.0", name: "SDXL Base 1.0", type: "image", params: [] },
   ],
 };
 
@@ -500,6 +587,22 @@ export function getModelTargetFormat(aliasOrId, modelId) {
   if (!models) return null;
   const found = models.find(m => m.id === modelId);
   return found?.targetFormat || null;
+}
+
+export function getModelUpstreamId(aliasOrId, modelId) {
+  const models = PROVIDER_MODELS[aliasOrId];
+  const found = models?.find(m => m.id === modelId);
+  if (found?.upstreamModelId) return found.upstreamModelId;
+  if (aliasOrId === "cx" && typeof modelId === "string" && modelId.endsWith(CODEX_REVIEW_SUFFIX)) {
+    return modelId.slice(0, -CODEX_REVIEW_SUFFIX.length);
+  }
+  return modelId;
+}
+
+export function getModelQuotaFamily(aliasOrId, modelId) {
+  const models = PROVIDER_MODELS[aliasOrId];
+  const found = models?.find(m => m.id === modelId);
+  return found?.quotaFamily || "normal";
 }
 
 // OAuth providers that use short aliases (everything else: alias = id)

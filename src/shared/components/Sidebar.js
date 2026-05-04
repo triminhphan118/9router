@@ -13,6 +13,8 @@ import { ConfirmModal } from "./Modal";
 
 // const VISIBLE_MEDIA_KINDS = ["embedding", "image", "imageToText", "tts", "stt", "webSearch", "webFetch", "video", "music"];
 const VISIBLE_MEDIA_KINDS = ["embedding", "image", "tts"];
+// Combined entry: webSearch + webFetch share one page at /dashboard/media-providers/web
+const COMBINED_WEB_ITEM = { id: "web", label: "Web Fetch & Search", icon: "travel_explore", href: "/dashboard/media-providers/web" };
 
 const navItems = [
   { href: "/dashboard/endpoint", label: "Endpoint", icon: "api" },
@@ -43,10 +45,12 @@ export default function Sidebar({ onClose }) {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState(null);
   const [enableTranslator, setEnableTranslator] = useState(false);
   const { copied, copy } = useCopyToClipboard(2000);
 
   const INSTALL_CMD = UPDATER_CONFIG.installCmd;
+  const STATUS_URL = `http://localhost:${UPDATER_CONFIG.statusPort}/update/status`;
 
   useEffect(() => {
     fetch("/api/settings")
@@ -81,13 +85,29 @@ export default function Sidebar({ onClose }) {
         setIsUpdating(false);
         return;
       }
-      // Server will exit shortly; show disconnected overlay
       setIsDisconnected(true);
     } catch (e) {
-      // Expected once the server exits; treat as disconnected
       setIsDisconnected(true);
     }
   };
+
+  // Poll updater status server while updating (Next server is dead, updater.js is alive)
+  useEffect(() => {
+    if (!isUpdating || !isDisconnected) return;
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(STATUS_URL, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (!stopped) setUpdateStatus(data);
+        }
+      } catch { /* updater not ready yet or finished */ }
+    };
+    tick();
+    const id = setInterval(tick, UPDATER_CONFIG.statusPollIntervalMs);
+    return () => { stopped = true; clearInterval(id); };
+  }, [isUpdating, isDisconnected, STATUS_URL]);
 
   const handleShutdown = async () => {
     setIsShuttingDown(true);
@@ -103,7 +123,7 @@ export default function Sidebar({ onClose }) {
 
   return (
     <>
-      <aside className="flex w-72 flex-col border-r border-black/5 dark:border-white/5 bg-vibrancy backdrop-blur-xl transition-colors duration-300 min-h-full">
+      <aside className="flex w-72 flex-col border-r border-border-subtle bg-vibrancy backdrop-blur-xl transition-colors duration-300 min-h-full">
         {/* Traffic lights */}
         <div className="flex items-center gap-2 px-6 pt-5 pb-2">
           <div className="w-3 h-3 rounded-full bg-[#FF5F56]" />
@@ -114,7 +134,7 @@ export default function Sidebar({ onClose }) {
         {/* Logo */}
         <div className="px-6 py-4 flex flex-col gap-2">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex items-center justify-center size-9 rounded bg-linear-to-br from-[#f97815] to-[#c2590a]">
+            <div className="flex items-center justify-center size-9 rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-700 shadow-[var(--shadow-warm)]">
               <span className="material-symbols-outlined text-white text-[20px]">hub</span>
             </div>
             <div className="flex flex-col">
@@ -158,10 +178,10 @@ export default function Sidebar({ onClose }) {
               href={item.href}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
+                "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all group",
                 isActive(item.href)
                   ? "bg-primary/10 text-primary"
-                  : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                  : "text-text-muted hover:bg-surface-2 hover:text-text-main"
               )}
             >
               <span
@@ -172,12 +192,12 @@ export default function Sidebar({ onClose }) {
               >
                 {item.icon}
               </span>
-              <span className="text-sm font-medium">{item.label}</span>
+              <span className="text-[13px] font-medium">{item.label}</span>
             </Link>
           ))}
 
           {/* System section */}
-          <div className="pt-4 mt-2">
+          <div className="pt-4 mt-2 space-y-1">
             <p className="px-4 text-xs font-semibold text-text-muted/60 uppercase tracking-wider mb-2">
               System
             </p>
@@ -186,14 +206,14 @@ export default function Sidebar({ onClose }) {
             <button
               onClick={() => setMediaOpen((v) => !v)}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
+                "w-full flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all group",
                 pathname.startsWith("/dashboard/media-providers")
                   ? "bg-primary/10 text-primary"
-                  : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                  : "text-text-muted hover:bg-surface-2 hover:text-text-main"
               )}
             >
               <span className="material-symbols-outlined text-[18px]">perm_media</span>
-              <span className="text-sm font-medium flex-1 text-left">Media Providers</span>
+              <span className="text-[13px] font-medium flex-1 text-left">Media Providers</span>
               <span className="material-symbols-outlined text-[14px] transition-transform" style={{ transform: mediaOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
                 expand_more
               </span>
@@ -209,13 +229,27 @@ export default function Sidebar({ onClose }) {
                       "flex items-center gap-3 px-4 py-1.5 rounded-lg transition-all group",
                       pathname.startsWith(`/dashboard/media-providers/${kind.id}`)
                         ? "bg-primary/10 text-primary"
-                        : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                        : "text-text-muted hover:bg-surface-2 hover:text-text-main"
                     )}
                   >
                     <span className="material-symbols-outlined text-[16px]">{kind.icon}</span>
                     <span className="text-sm">{kind.label}</span>
                   </Link>
                 ))}
+                <Link
+                  key={COMBINED_WEB_ITEM.id}
+                  href={COMBINED_WEB_ITEM.href}
+                  onClick={onClose}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-1.5 rounded-lg transition-all group",
+                    pathname.startsWith(COMBINED_WEB_ITEM.href)
+                      ? "bg-primary/10 text-primary"
+                      : "text-text-muted hover:bg-surface-2 hover:text-text-main"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[16px]">{COMBINED_WEB_ITEM.icon}</span>
+                  <span className="text-sm">{COMBINED_WEB_ITEM.label}</span>
+                </Link>
               </div>
             )}
 
@@ -225,10 +259,10 @@ export default function Sidebar({ onClose }) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
+                  "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all group",
                   isActive(item.href)
                     ? "bg-primary/10 text-primary"
-                    : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                    : "text-text-muted hover:bg-surface-2 hover:text-text-main"
                 )}
               >
                 <span
@@ -239,7 +273,7 @@ export default function Sidebar({ onClose }) {
                 >
                   {item.icon}
                 </span>
-                <span className="text-sm font-medium">{item.label}</span>
+                <span className="text-[13px] font-medium">{item.label}</span>
               </Link>
             ))}
 
@@ -252,10 +286,10 @@ export default function Sidebar({ onClose }) {
                   href={item.href}
                   onClick={onClose}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
+                    "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all group",
                     isActive(item.href)
                       ? "bg-primary/10 text-primary"
-                      : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                      : "text-text-muted hover:bg-surface-2 hover:text-text-main"
                   )}
                 >
                   <span
@@ -266,7 +300,7 @@ export default function Sidebar({ onClose }) {
                   >
                     {item.icon}
                   </span>
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="text-[13px] font-medium">{item.label}</span>
                 </Link>
               ) : null;
             })}
@@ -276,10 +310,10 @@ export default function Sidebar({ onClose }) {
               href="/dashboard/profile"
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
+                "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all group",
                 isActive("/dashboard/profile")
                   ? "bg-primary/10 text-primary"
-                  : "text-text-muted hover:bg-surface/50 hover:text-text-main"
+                  : "text-text-muted hover:bg-surface-2 hover:text-text-main"
               )}
             >
               <span
@@ -290,13 +324,13 @@ export default function Sidebar({ onClose }) {
               >
                 settings
               </span>
-              <span className="text-sm font-medium">Settings</span>
+              <span className="text-[13px] font-medium">Settings</span>
             </Link>
           </div>
         </nav>
 
         {/* Footer section */}
-        <div className="p-3 border-t border-black/5 dark:border-white/5">
+        <div className="p-3 border-t border-border-subtle">
           {/* Shutdown button */}
           <Button
             variant="outline"
@@ -338,31 +372,27 @@ export default function Sidebar({ onClose }) {
 
       {/* Disconnected Overlay */}
       {isDisconnected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="text-center p-8">
-            {isUpdating ? (
-              <>
-                <div className="flex items-center justify-center size-16 rounded-full bg-green-500/20 text-green-500 mx-auto mb-4">
-                  <span className="material-symbols-outlined text-[32px]">download</span>
-                </div>
-                <h2 className="text-xl font-semibold text-white mb-2">Updating 9Router</h2>
-                <p className="text-text-muted mb-6">
-                  A new terminal window is installing the update. Once finished, run <code className="text-green-400">9router</code> again.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-center size-16 rounded-full bg-red-500/20 text-red-500 mx-auto mb-4">
-                  <span className="material-symbols-outlined text-[32px]">power_off</span>
-                </div>
-                <h2 className="text-xl font-semibold text-white mb-2">Server Disconnected</h2>
-                <p className="text-text-muted mb-6">The proxy server has been stopped.</p>
-                <Button variant="secondary" onClick={() => globalThis.location.reload()}>
-                  Reload Page
-                </Button>
-              </>
-            )}
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          {isUpdating ? (
+            <UpdateProgress
+              status={updateStatus}
+              latestVersion={updateInfo?.latestVersion}
+              installCmd={INSTALL_CMD}
+              copied={copied}
+              onCopy={() => copy(INSTALL_CMD)}
+            />
+          ) : (
+            <div className="text-center p-8">
+              <div className="flex items-center justify-center size-16 rounded-full bg-red-500/20 text-red-500 mx-auto mb-4">
+                <span className="material-symbols-outlined text-[32px]">power_off</span>
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Server Disconnected</h2>
+              <p className="text-text-muted mb-6">The proxy server has been stopped.</p>
+              <Button variant="secondary" onClick={() => globalThis.location.reload()}>
+                Reload Page
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -371,4 +401,138 @@ export default function Sidebar({ onClose }) {
 
 Sidebar.propTypes = {
   onClose: PropTypes.func,
+};
+
+function UpdateProgress({ status, latestVersion, installCmd, copied, onCopy }) {
+  const phase = status?.phase || "connecting";
+  const done = status?.done === true;
+  const success = status?.success === true;
+  const attempt = status?.attempt || 0;
+  const maxRetries = status?.maxRetries || 0;
+  const logTail = status?.logTail || [];
+  const errorMsg = status?.error;
+
+  const steps = [
+    { key: "stopped", label: "Stopped 9Router server", state: "done" },
+    {
+      key: "launched",
+      label: "Launched background installer",
+      state: status ? "done" : "active",
+    },
+    {
+      key: "waiting",
+      label: "Waiting for app processes to exit",
+      state: phase === "waitingForExit" ? "active" :
+        (status && phase !== "starting" ? "done" : "pending"),
+    },
+    {
+      key: "installing",
+      label: attempt > 1 ? `Installing v${latestVersion || "latest"} (attempt ${attempt}/${maxRetries})` : `Installing v${latestVersion || "latest"}`,
+      state: done ? (success ? "done" : "error") : (phase === "installing" ? "active" : "pending"),
+    },
+    {
+      key: "finished",
+      label: done && success ? "Installed — ready to restart" : "Waiting to finish",
+      state: done && success ? "done" : (done && !success ? "error" : "pending"),
+    },
+  ];
+
+  return (
+    <div className="w-full max-w-lg rounded-xl bg-neutral-900/95 border border-white/10 p-6 text-white">
+      <div className="flex items-center gap-3 mb-4">
+        <div className={cn(
+          "flex items-center justify-center size-11 rounded-full",
+          done && success ? "bg-green-500/20 text-green-400" :
+          done && !success ? "bg-red-500/20 text-red-400" :
+          "bg-blue-500/20 text-blue-400"
+        )}>
+          <span className={cn(
+            "material-symbols-outlined text-[24px]",
+            !done && "animate-spin"
+          )}>
+            {done && success ? "check_circle" : done && !success ? "error" : "progress_activity"}
+          </span>
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">
+            {done && success ? "Update Completed" : done && !success ? "Update Failed" : "Updating 9Router"}
+          </h2>
+          <p className="text-xs text-white/60">
+            {done && success
+              ? `Installed v${latestVersion || "latest"} successfully`
+              : done && !success
+                ? (errorMsg || "Installation failed")
+                : `Installing v${latestVersion || "latest"} from npm...`}
+          </p>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      <ul className="space-y-2 mb-4">
+        {steps.map((s) => (
+          <li key={s.key} className="flex items-center gap-3 text-sm">
+            <span className={cn(
+              "material-symbols-outlined text-[18px] shrink-0",
+              s.state === "done" && "text-green-400",
+              s.state === "active" && "text-blue-400 animate-pulse",
+              s.state === "error" && "text-red-400",
+              s.state === "pending" && "text-white/30"
+            )}>
+              {s.state === "done" ? "check_circle" :
+                s.state === "error" ? "cancel" :
+                  s.state === "active" ? "radio_button_checked" : "radio_button_unchecked"}
+            </span>
+            <span className={cn(
+              s.state === "pending" ? "text-white/40" : "text-white/90"
+            )}>{s.label}</span>
+          </li>
+        ))}
+      </ul>
+
+      {/* Log tail */}
+      {logTail.length > 0 && (
+        <div className="rounded-md bg-black/50 border border-white/5 p-3 mb-4 max-h-40 overflow-auto">
+          <pre className="text-[11px] font-mono text-white/70 whitespace-pre-wrap break-all">
+            {logTail.join("\n")}
+          </pre>
+        </div>
+      )}
+
+      {/* Actions */}
+      {done && success ? (
+        <div className="space-y-2">
+          <p className="text-sm text-white/80">
+            Run <code className="px-1.5 py-0.5 rounded bg-white/10 text-green-400">9router</code> in your terminal to start the new version.
+          </p>
+          <Button variant="secondary" fullWidth onClick={() => globalThis.location.reload()}>
+            Reload Page
+          </Button>
+        </div>
+      ) : done && !success ? (
+        <div className="space-y-2">
+          <p className="text-sm text-white/80">Run the install command manually:</p>
+          <button
+            onClick={onCopy}
+            className="w-full text-left px-3 py-2 rounded bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <code className="text-xs font-mono text-amber-400">
+              {copied ? "✓ copied!" : installCmd}
+            </code>
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-white/50 text-center">
+          This may take 30-60 seconds. Please don't close this window.
+        </p>
+      )}
+    </div>
+  );
+}
+
+UpdateProgress.propTypes = {
+  status: PropTypes.object,
+  latestVersion: PropTypes.string,
+  installCmd: PropTypes.string.isRequired,
+  copied: PropTypes.bool,
+  onCopy: PropTypes.func.isRequired,
 };
